@@ -5,6 +5,9 @@
     // instead of `window` for `WebWorker` support.
     var root = typeof self === 'object' && self.self === self && self || this;
 
+    // Default rotation angle
+    let CANVAS_ROTATION_DEGREES = 0;
+
     // Create a safe reference to the handwriting object for use below.        
     var handwriting = function(obj) {
         if (obj instanceof handwriting) return obj;
@@ -67,6 +70,33 @@
         this.options = options;
     };
 
+    // Function to set rotation angle dynamically
+    handwriting.Canvas.prototype.setRotation = function(degrees) {
+        CANVAS_ROTATION_DEGREES = degrees;
+    };
+
+    // Add this helper function at the top (after var handwriting = ...)
+    function getUnrotatedCoords(x, y, canvas, angleDegrees) {
+        // Get canvas center in page coordinates
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        // Translate point to center
+        const dx = x - cx;
+        const dy = y - cy;
+
+        // Inverse rotate
+        const angle = -angleDegrees * Math.PI / 180;
+        const rx = dx * Math.cos(angle) - dy * Math.sin(angle);
+        const ry = dx * Math.sin(angle) + dy * Math.cos(angle);
+
+        // Translate back to canvas coordinates
+        return {
+            x: rx + canvas.width / 2,
+            y: ry + canvas.height / 2
+        };
+    }
 
     handwriting.Canvas.prototype.mouseDown = function(e) {
         // new stroke
@@ -75,24 +105,24 @@
         this.handwritingY = [];
         this.drawing = true;
         this.cxt.beginPath();
-        var rect = this.canvas.getBoundingClientRect();
-        var x = e.clientX - rect.left;
-        var y = e.clientY - rect.top;
-        this.cxt.moveTo(x, y);
-        this.handwritingX.push(x);
-        this.handwritingY.push(y);
+        var x = e.clientX;
+        var y = e.clientY;
+        var coords = getUnrotatedCoords(x, y, this.canvas, CANVAS_ROTATION_DEGREES);
+        this.cxt.moveTo(coords.x, coords.y);
+        this.handwritingX.push(coords.x);
+        this.handwritingY.push(coords.y);
     };
 
 
     handwriting.Canvas.prototype.mouseMove = function(e) {
         if (this.drawing) {
-            var rect = this.canvas.getBoundingClientRect();
-            var x = e.clientX - rect.left;
-            var y = e.clientY - rect.top;
-            this.cxt.lineTo(x, y);
+            var x = e.clientX;
+            var y = e.clientY;
+            var coords = getUnrotatedCoords(x, y, this.canvas, CANVAS_ROTATION_DEGREES);
+            this.cxt.lineTo(coords.x, coords.y);
             this.cxt.stroke();
-            this.handwritingX.push(x);
-            this.handwritingY.push(y);
+            this.handwritingX.push(coords.x);
+            this.handwritingY.push(coords.y);
         }
     };
 
@@ -112,31 +142,25 @@
         this.cxt.lineWidth = this.lineWidth;
         this.handwritingX = [];
         this.handwritingY = [];
-        var de = document.documentElement;
-        var box = this.canvas.getBoundingClientRect();
-        var top = box.top + window.pageYOffset - de.clientTop;
-        var left = box.left + window.pageXOffset - de.clientLeft;
         var touch = e.changedTouches[0];
-        touchX = touch.pageX - left;
-        touchY = touch.pageY - top;
-        this.handwritingX.push(touchX);
-        this.handwritingY.push(touchY);
+        var x = touch.clientX;
+        var y = touch.clientY;
+        var coords = getUnrotatedCoords(x, y, this.canvas, CANVAS_ROTATION_DEGREES);
+        this.handwritingX.push(coords.x);
+        this.handwritingY.push(coords.y);
         this.cxt.beginPath();
-        this.cxt.moveTo(touchX, touchY);
+        this.cxt.moveTo(coords.x, coords.y);
     };
 
     handwriting.Canvas.prototype.touchMove = function(e) {
         e.preventDefault();
         var touch = e.targetTouches[0];
-        var de = document.documentElement;
-        var box = this.canvas.getBoundingClientRect();
-        var top = box.top + window.pageYOffset - de.clientTop;
-        var left = box.left + window.pageXOffset - de.clientLeft;
-        var x = touch.pageX - left;
-        var y = touch.pageY - top;
-        this.handwritingX.push(x);
-        this.handwritingY.push(y);
-        this.cxt.lineTo(x, y);
+        var x = touch.clientX;
+        var y = touch.clientY;
+        var coords = getUnrotatedCoords(x, y, this.canvas, CANVAS_ROTATION_DEGREES);
+        this.handwritingX.push(coords.x);
+        this.handwritingY.push(coords.y);
+        this.cxt.lineTo(coords.x, coords.y);
         this.cxt.stroke();
     };
 
